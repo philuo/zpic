@@ -1,0 +1,13 @@
+{
+  "name": "zpic",
+  "version": "1.0.1",
+  "description": "压图工具",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "keywords": ["img-compress"],
+  "author": "Perfumere <1061393710@qq.com>",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
