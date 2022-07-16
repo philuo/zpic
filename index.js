@@ -5,7 +5,8 @@ export async function compress(data, width, height, quality = 75) {
         zpicIns = await (await import('./zpic')).default;
     }
 
-    return zpicIns.encode(data, width, height, {
+    const startTime = Date.now();
+    const result = await zpicIns.encode(data, width, height, {
         quality,
         baseline: false,
         arithmetic: false,
@@ -23,4 +24,25 @@ export async function compress(data, width, height, quality = 75) {
         separate_chroma_quality: false,
         chroma_quality: 75,
     });
+
+    return {
+        usedTime: Date.now() - startTime,
+        buffer: result.buffer,
+        src: URL.createObjectURL(new Blob([result.buffer], { type: 'image/jpeg' })),
+        size: result.length
+    };
+}
+
+export function compressWorker() {
+    let url;
+
+    if (import.meta.env.DEV) {
+        url = new URL('./functor.js', import.meta.url).pathname;
+    }
+    else {
+        // 1. 直接加载 CORS worker, 估计不行
+        // 2. fetch拉取文件ArrayBuffer -> Blob -> 本地链接(blob:http?s://xxx)
+    }
+
+    return new Worker(url);
 }

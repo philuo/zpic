@@ -17,6 +17,13 @@ interface EncodeOptions {
     chroma_quality: number;
 }
 
+/**
+ * 压图工具(主线程)
+ * @param data 图片bitmap数据
+ * @param width 期望宽度
+ * @param height 期望高度
+ * @param quality 期望质量
+ */
 export function compress(
     /** 图片数据 */
     data: BufferSource,
@@ -27,3 +34,8 @@ export function compress(
     /** 期望质量 1~100, 默认75 */
     quality?: number
 ): Uint8Array;
+
+/**
+ * 新建压图线程(Worker)
+ */
+export function compressWorker(): Worker;
