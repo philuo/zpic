@@ -5,7 +5,7 @@
   "main": "index.js",
   "types": "index.d.ts",
   "keywords": ["img-compress"],
-  "author": "Perfumere <1061393710@qq.com>",
+  "author": "Perfumere <developer@philuo.com>",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

@@ -1,10 +1,18 @@
-# 压图工具`zpic`
+# Util of image compressing `zpic`
 
 ## Power by [Mozjpeg](https://github.com/mozilla/mozjpeg)
+
+ - `Worker + WebAssembly` 本地压图, 图片压缩无网络传输
+ - support in browser (ios 10+, chrome 82+)
+
+## How to use
+
+### 同步导入
 
 ```ts
 import { compress } from 'zpic';
 
+// attention: src must be a same-origin source
 async function getImgData(src: string) {
     const img = new Image();
     img.src = src;
@@ -20,10 +28,8 @@ async function getImgData(src: string) {
 
 const imgSrc = '<base64>/uri';
 const image = await getImgData(imgSrc);
-const imgData = await compress(image.data, image.width, image.height, 92);
-const url = URL.createObjectURL(
-    new Blob([imgData], { type: 'image/jpeg' })
-);
+const result = await compress(image.data, image.width, image.height, 92);
+const url = URL.createObjectURL(new Blob([result.buffer], { type: 'image/jpeg' }));
 ```
 
 
@@ -44,32 +50,4 @@ async function compressImg() {
 
     // do your job
 }
-```
-
-### Worker中使用
-
-- 开发环境引用本地Worker, 生产环境引用CDN Worker
-
-```ts
-import { compressWorker } from 'zpic';
-
-const worker = compressWorker();
-const image = await getImgData(imgSrc); // 请传递图片源(请保证图片时同源的)
-
-worker.postMessage({
-    type: 'job',
-    data: image, // { data: ArrayBuffer, width, height }
-    quality: 75  // 可选图片质量, 默认75
-});
-
-worker.addEventListener('message', ({ data }) => {
-    /**
-     * {
-     *     buffer: Uint8Array(105715) [...]
-     *     size: 105715
-     *     src: "blob:http://192.168.31.244:3000/7ff5dc98-6ba5-42e8-be1a-365aba45e63c"
-     *     usedTime: 710
-     * }
-     */
-});
 ```

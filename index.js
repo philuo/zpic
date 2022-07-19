@@ -1,48 +1,178 @@
-let zpicIns;
+const wasmFile = 'zpic.wasm';
+const glueFile = 'zpic.min.js';
+const MAX_WORKER = navigator.hardwareConcurrency || 4;
+let defaultCDN = 'https://cdn.plog.top/libs';
+let glueUrl, wasmBuffer;
 
-export async function compress(data, width, height, quality = 75) {
-    if (!zpicIns) {
-        zpicIns = await (await import('./zpic')).default;
+class WorkerPool {
+    static list = [];
+    static add(worker) {
+        worker.postMessage({ type: 'init', buffer: wasmBuffer });
+        worker.addEventListener('message', ({ data }) => {
+            switch (data.type) {
+                case 'close':
+                    this.del(worker);
+                    worker = null;
+                    break;
+                case 'error':
+                    this.del(worker);
+                    worker = null;
+                    break;
+                default:
+                    worker.isWorking = false;
+            }
+        });
+        WorkerPool.list.push(worker);
     }
+    static del(worker) {
+        const index = WorkerPool.list.indexOf(worker);
 
-    const startTime = Date.now();
-    const result = await zpicIns.encode(data, width, height, {
-        quality,
-        baseline: false,
-        arithmetic: false,
-        progressive: true,
-        optimize_coding: true,
-        smoothing: 0,
-        color_space: 3,
-        quant_table: 3,
-        trellis_multipass: false,
-        trellis_opt_zero: false,
-        trellis_opt_table: false,
-        trellis_loops: 1,
-        auto_subsample: true,
-        chroma_subsample: 2,
-        separate_chroma_quality: false,
-        chroma_quality: 75,
+        if (~index) {
+            worker.terminate();
+            WorkerPool.list.splice(index, 1);
+            worker = null;
+        }
+    }
+    static get() {
+        for (const worker of WorkerPool.list) {
+            if (!worker.isWorking) {
+                return worker;
+            }
+        }
+    }
+    static async job(data, quality) {
+        const { resolve, promise } = genPromise();
+        const handler = ({ data }) => {
+            if (!data.type) {
+                resolve(data);
+                worker.removeEventListener('message', handler);
+                worker = null;
+            }
+        };
+        let worker = WorkerPool.get();
+
+        if (!worker) {
+            worker = await createWorker();
+        }
+        if (!worker) {
+            console.log('O_O, 线程不够用了, 请等一下');
+            await new Promise(r => setTimeout(r, 200));
+            return await WorkerPool.job(data, quality);
+        }
+
+        worker.isWorking = true;
+        worker.postMessage({ type: 'job', data, quality });
+        worker.addEventListener('message', handler);
+
+        return promise;
+    }
+    static size() {
+        return WorkerPool.list.length;
+    }
+}
+
+/**
+ * 刷新Worker依赖的BufferSource
+ */
+export function refreshBufferSource(origin, key) {
+    defaultCDN = origin;
+
+    return fetch(new URL(key, origin).toString())
+        .then(res => res.arrayBuffer())
+        .then(buffer => {
+            addLibsCache(key, buffer);
+
+            return buffer;
+        });
+}
+
+/** 初始化Worker依赖的BufferSource */
+async function initBufferSource() {
+    if (!glueUrl) {
+        let buffer = await getLibsCache(glueFile);
+
+        if (!buffer) {
+            buffer = await refreshBufferSource(defaultCDN, glueFile);
+        }
+
+        glueUrl = URL.createObjectURL(new Blob([buffer], { type: 'text/javascript' }));
+    }
+    if (!wasmBuffer) {
+        wasmBuffer = await getLibsCache(wasmFile);
+
+        if (!wasmBuffer) {
+            wasmBuffer = await refreshBufferSource(defaultCDN, wasmFile);
+        }
+    }
+}
+async function createWorker() {
+    await initBufferSource();
+
+    if (WorkerPool.size() < MAX_WORKER) {
+        const worker = new Worker(glueUrl);
+        WorkerPool.add(worker);
+    
+        return worker;
+    }
+}
+
+function genPromise() {
+    let resolve;
+    let reject;
+    const promise = new Promise((success, error) => {
+        resolve = success;
+        reject = error;
     });
 
     return {
-        usedTime: Date.now() - startTime,
-        buffer: result.buffer,
-        src: URL.createObjectURL(new Blob([result.buffer], { type: 'image/jpeg' })),
-        size: result.length
+        resolve,
+        reject,
+        promise
     };
 }
+function initFileCache() {
+    if (!initFileCache.promise) {
+        const idbReq = indexedDB.open('fileCache', 1);
+        const { resolve, reject, promise } = genPromise();
+        initFileCache.promise = promise;
 
-export function compressWorker() {
-    let url;
-
-    if (import.meta.env.DEV) {
-        url = new URL('./functor.js', import.meta.url).pathname;
+        idbReq.onupgradeneeded = ({ oldVersion }) => {
+            if (oldVersion !== 1) {
+                idbReq.result.createObjectStore('libs');
+            }
+        };
+        idbReq.onsuccess = () => resolve(idbReq.result);
+        idbReq.onerror = () => reject(idbReq.error);
     }
-    else {
-        // 1. 直接加载 CORS worker, 估计不行
-        // 2. fetch拉取文件ArrayBuffer -> Blob -> 本地链接(blob:http?s://xxx)
-    }
 
-    return new Worker(url);
+    return initFileCache.promise;
+}
+function addLibsCache(key, buffer) {
+    const { resolve, reject, promise } = genPromise();
+
+    initFileCache().then(idb => {
+        const transaction = idb.transaction('libs', 'readwrite');
+        const request = transaction.objectStore('libs').put(buffer, key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+
+    return promise;
+}
+function getLibsCache(key) {
+    const { resolve, reject, promise } = genPromise();
+
+    initFileCache().then(idb => {
+        const transaction = idb.transaction('libs', 'readonly');
+        const libs = transaction.objectStore('libs');
+        const request = libs.get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+
+    return promise;
+}
+
+export function compress(data, quality) {
+    return WorkerPool.job(data, quality);
 }

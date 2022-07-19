@@ -1,4 +1,4 @@
-interface EncodeOptions {
+export interface EncodeOptions {
     quality: number;
     baseline: boolean;
     arithmetic: boolean;
@@ -17,25 +17,23 @@ interface EncodeOptions {
     chroma_quality: number;
 }
 
-/**
- * 压图工具(主线程)
- * @param data 图片bitmap数据
- * @param width 期望宽度
- * @param height 期望高度
- * @param quality 期望质量
- */
-export function compress(
-    /** 图片数据 */
-    data: BufferSource,
-    /** 期望宽度 */
-    width: number,
-    /** 期望高度 */
-    height: number,
-    /** 期望质量 1~100, 默认75 */
-    quality?: number
-): Uint8Array;
+export interface CompressResult {
+    /** 压缩文件的内存数据 */
+    buffer: ArrayBuffer;
+    /** 压缩耗时(ms) */
+    usedTime: number;
+    /** 压缩后的文件体积(Byte) */
+    size: number;
+}
 
 /**
  * 新建压图线程(Worker)
  */
-export function compressWorker(): Worker;
+export function compress(data: ImageData, quality?: number): Promise<CompressResult>;
+
+/**
+ * 刷新Worker依赖的BufferSource
+ * @param origin CDN链接 https://cdn.plog.top/libs
+ * @param key 指定文件名 zpic.min.js | zpic.js | zpic.wasm
+ */
+export function refreshBufferSource(origin: string, key: string): Promise<ArrayBuffer>;
