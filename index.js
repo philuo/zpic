@@ -132,6 +132,8 @@ function genPromise() {
 }
 function initFileCache() {
     if (!initFileCache.promise) {
+        /** [fix webkit bug](https://bugs.webkit.org/show_bug.cgi?id=226547) */
+        indexedDB.open('__test', 1);
         const idbReq = indexedDB.open('fileCache', 1);
         const { resolve, reject, promise } = genPromise();
         initFileCache.promise = promise;
