@@ -1,7 +1,7 @@
 const wasmFile = 'zpic.wasm';
 const glueFile = 'zpic.min.js';
 const MAX_WORKER = navigator.hardwareConcurrency || 4;
-let defaultCDN = 'https://cdn.plog.top/libs';
+let defaultCDN = 'https://cdn.plog.top/libs/';
 let glueUrl, wasmBuffer;
 
 class WorkerPool {

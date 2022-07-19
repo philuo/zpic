@@ -1,6 +1,6 @@
 {
   "name": "zpic",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "压图工具",
   "main": "index.js",
   "types": "index.d.ts",

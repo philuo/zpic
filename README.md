@@ -7,6 +7,9 @@
 
 ## How to use
 
+使用`indexedDB`缓存了Worker所需的BufferSource, 默认从私人CDN: `https://cdn.plog.top/libs` 导入。
+需要替换为你自己的CDN, 或者你可以修改源码为加载本地文件的形式。**后续流量大了私人CDN将关闭！**
+
 ### 同步导入
 
 ```ts
