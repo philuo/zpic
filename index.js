@@ -111,7 +111,7 @@ async function createWorker() {
     if (WorkerPool.size() < MAX_WORKER) {
         const worker = new Worker(glueUrl);
         WorkerPool.add(worker);
-    
+
         return worker;
     }
 }
@@ -149,12 +149,20 @@ function initFileCache() {
 
     return initFileCache.promise;
 }
-function addLibsCache(key, buffer) {
+function addLibsCache(name, file) {
     const { resolve, reject, promise } = genPromise();
 
     initFileCache().then(idb => {
-        const transaction = idb.transaction('libs', 'readwrite');
-        const request = transaction.objectStore('libs').put(buffer, key);
+        const libs = idb.transaction('libs', 'readwrite').objectStore('libs');
+        let request;
+
+        if (!libs.keyPath) {
+            request = libs.put(file, name);
+        }
+        else {
+            request = libs.put({ [libs.keyPath]: name, file });
+        }
+
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
@@ -165,10 +173,16 @@ function getLibsCache(key) {
     const { resolve, reject, promise } = genPromise();
 
     initFileCache().then(idb => {
-        const transaction = idb.transaction('libs', 'readonly');
-        const libs = transaction.objectStore('libs');
+        const libs = idb.transaction('libs', 'readonly').objectStore('libs');
         const request = libs.get(key);
-        request.onsuccess = () => resolve(request.result);
+
+        request.onsuccess = () => {
+            if (request.result && request.result.file) {
+                return resolve(request.result.file);
+            }
+
+            resolve(request.result);
+        };
         request.onerror = () => reject(request.error);
     });
 
